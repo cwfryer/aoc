@@ -1,0 +1,410 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+type xy struct {
+	x, y int
+	mode string
+	face int
+}
+
+func (p *xy) move(d string) *xy {
+    newP := &xy{x:p.x,y:p.y}
+	switch d {
+	case "north":
+		newP.y -= 1
+	case "south":
+		newP.y += 1
+	case "east":
+		newP.x += 1
+	case "west":
+		newP.x -= 1
+	}
+
+	return newP.mapFace()
+}
+
+func (p *xy) mapFace() *xy {
+	if p.mode != "oob" {
+		if p.x >= 50 && p.x <= 99 && p.y >= 0 && p.y <= 49 {
+			p.face = 1
+		}
+		if p.x >= 100 && p.x <= 149 && p.y >= 0 && p.y <= 49 {
+			p.face = 2
+		}
+		if p.x >= 50 && p.x <= 99 && p.y >= 50 && p.y <= 99 {
+			p.face = 3
+		}
+		if p.x >= 0 && p.x <= 49 && p.y >= 100 && p.y <= 149 {
+			p.face = 4
+		}
+		if p.x >= 50 && p.x <= 99 && p.y >= 100 && p.y <= 149 {
+			p.face = 5
+		}
+		if p.x >= 0 && p.x <= 49 && p.y >= 150 && p.y <= 199 {
+			p.face = 6
+		}
+	}
+	return p
+}
+
+type instruction struct {
+	count int
+	turn  string
+}
+
+func parseInput(infile string) (*xy, []*xy, []instruction) {
+	input, _ := os.ReadFile(infile)
+	tmp := strings.Split(string(input), "\n\n")
+
+	maprows := strings.Split(string(tmp[0]), "\n")
+
+	h := len(maprows)
+	w := 0
+	for _, row := range maprows {
+		if len(row) > w {
+			w = len(row)
+		}
+	}
+
+	var points []*xy
+	start := &xy{}
+
+	for y := 0; y < h; y++ {
+		s := fmt.Sprintf("%-*s", w, maprows[y])
+		start.y = 0
+		if y == 0 {
+			start.x = strings.Index(s, ".")
+		}
+		for x := 0; x < w; x++ {
+			switch s[x] {
+			case ' ':
+				points = append(points, &xy{x: x, y: y, mode: "oob"})
+			case '.':
+				points = append(points, &xy{x: x, y: y, mode: "path"})
+			case '#':
+				points = append(points, &xy{x: x, y: y, mode: "stop"})
+			}
+		}
+	}
+
+	for _, p := range points {
+		p = p.mapFace()
+	}
+
+	start = start.mapFace()
+
+	instructions := parseInstructions(tmp[1])
+
+	return start, points, instructions
+
+}
+
+func parseInstructions(s string) []instruction {
+	var l, n []rune
+	var i []instruction
+	for _, r := range s {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			l = append(l, r)
+			nint, _ := strconv.Atoi(string(n))
+			i = append(i, instruction{count: nint, turn: string(l)})
+			l = []rune{}
+			n = []rune{}
+		case r >= 'a' && r <= 'z':
+			l = append(l, r)
+			nint, _ := strconv.Atoi(string(n))
+			i = append(i, instruction{count: nint, turn: string(l)})
+			l = []rune{}
+			n = []rune{}
+		case r >= '0' && r <= '9':
+			n = append(n, r)
+		}
+	}
+	if len(n) > 0 {
+		nint, _ := strconv.Atoi(string(n))
+		i = append(i, instruction{count: nint})
+	}
+
+	return i
+}
+
+func main() {
+	infile := "day22/day22.input"
+	start, points, instructions := parseInput(infile)
+
+	sMap := make(map[string]struct{})
+	oMap := make(map[string]struct{})
+	for _, p := range points {
+		if p.mode == "stop" {
+			sMap[fmt.Sprintf("%d,%d", p.x, p.y)] = struct{}{}
+		}
+		if p.mode == "oob" {
+			oMap[fmt.Sprintf("%d,%d", p.x, p.y)] = struct{}{}
+		}
+	}
+
+	currentDirection := "east"
+
+	currentCoords := &xy{x: start.x, y: start.y, face: start.face}
+
+	for _, iSet := range instructions {
+		for i := 1; i <= iSet.count; i++ {
+			checkCoords := currentCoords.move(currentDirection)
+			// If you hit a stop block, don't actually move
+			if _, ok := sMap[fmt.Sprintf("%d,%d", checkCoords.x, checkCoords.y)]; ok {
+				break
+			}
+			// If you hit out of bounds, wrap around
+			if _, ok := oMap[fmt.Sprintf("%d,%d", checkCoords.x, checkCoords.y)]; ok ||
+				checkCoords.x < 0 || checkCoords.y < 0 ||
+				checkCoords.x > points[len(points)-1].x || checkCoords.y > points[len(points)-1].y {
+				// PART 1
+				// checkCoords = getWrapPoint(currentDirection, checkCoords, points)
+
+				// PART 2
+				var newDirection string
+				checkCoords, newDirection = getCubePoint(currentDirection, currentCoords, points)
+				if _, ok := sMap[fmt.Sprintf("%d,%d", checkCoords.x, checkCoords.y)]; ok {
+					break
+				}
+				// Otherwise, go to the wrap point
+				currentCoords, currentDirection = checkCoords, newDirection
+				continue
+			}
+			// If you didn't hit a stop or oob, go to that point
+			currentCoords = checkCoords
+		}
+		// After you finish walking, change direction if you need
+		if iSet.turn != "" {
+			switch currentDirection {
+			case "north":
+				if iSet.turn == "R" {
+					currentDirection = "east"
+				}
+				if iSet.turn == "L" {
+					currentDirection = "west"
+				}
+			case "south":
+				if iSet.turn == "R" {
+					currentDirection = "west"
+				}
+				if iSet.turn == "L" {
+					currentDirection = "east"
+				}
+			case "east":
+				if iSet.turn == "R" {
+					currentDirection = "south"
+				}
+				if iSet.turn == "L" {
+					currentDirection = "north"
+				}
+			case "west":
+				if iSet.turn == "R" {
+					currentDirection = "north"
+				}
+				if iSet.turn == "L" {
+					currentDirection = "south"
+				}
+			}
+		}
+	}
+
+	cdScore := map[string]int{
+		"east":  0,
+		"south": 1,
+		"west":  2,
+		"north": 3,
+	}[currentDirection]
+
+	fmt.Println("1000 *",(currentCoords.y + 1),"+ 4 *",(currentCoords.x + 1),"+", cdScore)
+	fmt.Println(1000 *(currentCoords.y + 1),"+",4 *(currentCoords.x + 1),"+", cdScore)
+	fmt.Println((1000 * (currentCoords.y + 1)) + (4 * (currentCoords.x + 1)) + cdScore)
+}
+
+func getWrapPoint(d string, p xy, points []xy) xy {
+	switch d {
+	case "north":
+		var tmp []int
+		for _, pt := range points {
+			if pt.x == p.x && pt.mode != "oob" {
+				tmp = append(tmp, pt.y)
+			}
+		}
+		sort.Ints(tmp)
+		return xy{x: p.x, y: tmp[len(tmp)-1]}
+	case "south":
+		var tmp []int
+		for _, pt := range points {
+			if pt.x == p.x && pt.mode != "oob" {
+				tmp = append(tmp, pt.y)
+			}
+		}
+		sort.Ints(tmp)
+		return xy{x: p.x, y: tmp[0]}
+	case "east":
+		var tmp []int
+		for _, pt := range points {
+			if pt.y == p.y && pt.mode != "oob" {
+				tmp = append(tmp, pt.x)
+			}
+		}
+		sort.Ints(tmp)
+		return xy{x: tmp[0], y: p.y}
+	case "west":
+		var tmp []int
+		for _, pt := range points {
+			if pt.y == p.y && pt.mode != "oob" {
+				tmp = append(tmp, pt.x)
+			}
+		}
+		sort.Ints(tmp)
+		return xy{x: tmp[len(tmp)-1], y: p.y}
+	}
+	panic(fmt.Sprintf("direction: %s\npoint: %d,%d", d, p.x, p.y))
+}
+
+func getCubePoint(d string, p *xy, points []*xy) (*xy, string) {
+	switch p.face {
+	case 1:
+		switch d {
+		case "north":
+			// enter on left of face 6
+			// perpendicular: swap x and y direction
+			// new Y = face1.x + 100
+			// X = 0
+			return &xy{x: 0, y: p.x + 100, face: 6}, "east"
+		case "south":
+			// enter on top of face 3
+			// this shouldn't be possible because this isn't OOB
+		case "east":
+			// enter on left of face 2
+			// this shouldn't be possible because this isn't OOB
+		case "west":
+			// enter on left of face 4
+			// parallel: same x and y direction
+			// X = 0
+			// new Y = 149 - face1.x
+			return &xy{x: 0, y: 149 - p.y, face: 4}, "east"
+		}
+	case 2:
+		switch d {
+		case "north":
+			// enter on bottom of face 6
+			// parallel
+			// new X = face2.x - 50
+			// Y = 199
+			return &xy{x: p.x - 100, y: 199, face: 6}, "north"
+		case "south":
+			// enter on right of face 3
+			// perpendicular
+			// X = 100
+			// new Y = face2.x - 50
+			return &xy{x: 100, y: p.x - 50, face: 3}, "west"
+		case "east":
+			// enter on right of face 5
+			// parallel
+			// X = 99
+			// new Y = 149 - face2.y
+			return &xy{x: 99, y: 149 - p.y, face: 2}, "west"
+		case "west":
+			// enter on right of face 1
+			// this shouldn't be possible because this isn't OOB
+		}
+	case 3:
+		switch d {
+		case "north":
+			// enter on bottom of face 1
+			// this shouldn't be possible because this isn't OOB
+		case "south":
+			// enter on top of face 5
+			// this shouldn't be possible because this isn't OOB
+		case "east":
+			// enter on bottom of face 2
+			// perpendicular
+			// Y = 49
+			// new X = face3.y + 50
+			return &xy{x: p.y + 50, y: 49, face: 2}, "north"
+		case "west":
+			// enter on top of face 4
+			// perpendicular
+			// Y = 100
+			// new X = face3.y - 50
+			return &xy{x: p.y - 50, y: 100, face: 4}, "south"
+		}
+	case 4:
+		switch d {
+		case "north":
+			// enter on left of face 3
+			// perpendicular
+			// X = 50
+			// new Y = face4.x + 50
+			return &xy{x: 50, y: p.x + 50, face: 3}, "east"
+		case "south":
+			// enter on top of face 6
+			// this shouldn't be possible because this isn't OOB
+		case "east":
+			// enter on left of face 5
+			// this shouldn't be possible because this isn't OOB
+            // TODO: this came up as an error
+		case "west":
+			// enter on left of face 1
+			// parallel
+			// X = 50
+			// new Y = 149 - face4.y
+			return &xy{x: 50, y: 149 - p.y, face: 1}, "east"
+		}
+	case 5:
+		switch d {
+		case "north":
+			// enter on bottom of face 3
+			// this shouldn't be possible because this isn't OOB
+		case "south":
+			// enter on left of face 6
+			// perpendicular
+			// X = 49
+			// new Y = face5.x + 100
+			return &xy{x: 49, y: p.y + 100, face: 6}, "west"
+		case "east":
+			// enter on right of face 2
+			// parallel
+			// X = 149
+			// new Y = 149 - face5.y
+			return &xy{x: 149, y: 149 - p.y, face: 2}, "west"
+		case "west":
+			// enter on right of face 4
+			// this shouldn't be possible because this isn't OOB
+		}
+	case 6:
+		switch d {
+		case "north":
+			// enter on bottom of face 4
+			// this shouldn't be possible because this isn't OOB
+		case "south":
+			// enter on top of face 2
+			// parallel
+			// Y = 0
+			// new X = face6.x + 100
+			return &xy{x: p.x + 100, y: 0, face: 2}, "south"
+		case "east":
+			// enter on bottom of face 5
+			// perpendicular
+			// Y = 149
+			// new X = face6.y - 100
+			return &xy{x: p.y - 100, y: 149, face: 5}, "north"
+		case "west":
+			// enter on top of face 1
+			// perpendicular
+			// Y = 0
+			// new X = face6.y - 100
+			return &xy{x: p.y - 100, y: 0, face: 1}, "south"
+		}
+	}
+	panic(fmt.Sprintf("direction: %s\npoint: %d,%d\nface: %d", d, p.x, p.y, p.face))
+}
