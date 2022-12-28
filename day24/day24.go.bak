@@ -1,0 +1,160 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"image"
+	"os"
+)
+
+type Blizzard struct {
+	location  image.Point
+	moveto    image.Point
+	direction rune
+}
+
+type Player struct {
+	location  image.Point
+	cardinals []image.Point
+}
+
+type GameState struct {
+	player    *Player
+	blizzards []*Blizzard
+	boundsMap map[image.Point]struct{}
+	bounds    image.Rectangle
+	end       image.Point
+}
+
+func main() {
+	gs := parseInput()
+	start := []*Player{{location: gs.player.location, cardinals: gs.player.cardinals}}
+	path, _ := bfs(start, gs, 0)
+	fmt.Println(path)
+}
+
+func bfs(queue []*Player, gs GameState, steps int) (int, bool) {
+    minutes := 0
+    currentStep := make(map[image.Point]bool)
+    currentStep[queue[0].location] = true
+
+    for !currentStep[gs.end] {
+        gs = updateBlizzards(gs)
+        whereBlizzards := make(map[image.Point]bool)
+        for _,b := range gs.blizzards {
+            whereBlizzards[b.location] = true
+        }
+        newStep := make(map[image.Point]bool)
+        for pos := range currentStep {
+            if !(whereBlizzards[pos]) {
+                newStep[pos] = true
+            }
+            for _,d := range gs.player.cardinals {
+                new := pos.Add(d)
+                if inBounds(new,gs.boundsMap)  && !whereBlizzards[new] {
+                    newStep[new] = true
+                }
+            }
+        }
+        currentStep = newStep
+        minutes ++
+    }
+
+    return minutes,true
+}
+
+func inBounds(p image.Point, boundsMap map[image.Point]struct{}) bool {
+	if _, found := boundsMap[p]; found {
+		return false
+	}
+	return true
+}
+
+func updateBlizzards(gs GameState) GameState {
+	for _, b := range gs.blizzards {
+		testLoc := b.location.Add(b.moveto)
+		if inBounds(testLoc, gs.boundsMap) {
+			b.location = testLoc
+			continue
+		}
+		switch d := b.direction; d {
+		case '>':
+			b.location = image.Pt(1, b.location.Y)
+		case '<':
+			b.location = image.Pt(gs.bounds.Max.X-2, b.location.Y)
+		case 'v':
+			b.location = image.Pt(b.location.X, 1)
+		case '^':
+			b.location = image.Pt(b.location.X, gs.bounds.Max.Y-2)
+		}
+	}
+
+	return gs
+}
+
+func playerOptions(player *Player, blizzards []*Blizzard, boundsMap map[image.Point]struct{}, end image.Point) ([]image.Point, bool) {
+	options := []image.Point{}
+	for _, d := range player.cardinals {
+		testLoc := player.location.Add(d)
+
+		if testLoc == end {
+			return []image.Point{end}, true
+		}
+
+		if !inBounds(testLoc, boundsMap) {
+			continue
+		}
+		for _, b := range blizzards {
+			if b.location == testLoc {
+				continue
+			}
+		}
+		options = append(options, testLoc)
+	}
+	return options, false
+}
+
+func parseInput() GameState {
+	sc := bufio.NewScanner(os.Stdin)
+	boundaries := make(map[image.Point]struct{})
+	player := &Player{cardinals: []image.Point{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}}
+	var blizzards []*Blizzard
+	var w int
+	row := 0
+	var line string
+	for sc.Scan() {
+		line = sc.Text()
+		for col, c := range sc.Text() {
+			if row == 0 && c == '.' {
+				w = len(sc.Text())
+				player.location = image.Pt(col, 0)
+			}
+			switch c {
+			case '#':
+				boundaries[image.Pt(col, row)] = struct{}{}
+			case '>':
+				blizzards = append(blizzards,
+					&Blizzard{location: image.Pt(col, row), moveto: image.Pt(1, 0), direction: c})
+			case '<':
+				blizzards = append(blizzards,
+					&Blizzard{location: image.Pt(col, row), moveto: image.Pt(-1, 0), direction: c})
+			case 'v':
+				blizzards = append(blizzards,
+					&Blizzard{location: image.Pt(col, row), moveto: image.Pt(0, 1), direction: c})
+			case '^':
+				blizzards = append(blizzards,
+					&Blizzard{location: image.Pt(col, row), moveto: image.Pt(0, -1), direction: c})
+			}
+
+		}
+		row++
+	}
+	var end image.Point
+	for col, c := range line {
+		if c == '.' {
+			end = image.Pt(col, row-1)
+		}
+	}
+	boundRect := image.Rect(0, 0, w, row)
+	return GameState{player, blizzards, boundaries, boundRect, end}
+}
