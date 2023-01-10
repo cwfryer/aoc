@@ -17,8 +17,11 @@ I'm actually pretty proud of this one. Worked like a charm, but a bit slow...
 ## Day 8
 Blazingly fast rust. It's a huge mess though... But it is fast.
 ## Day 9
+Got some help from reddit to learn about VecDeque
 ## Day 10
+Once I tried using a stack it was easy...
 ## Day 11
+I kind of hated this one...
 ## Day 12
 ## Day 13
 ## Day 14
