@@ -26,6 +26,7 @@ I kind of hated this one...
 I really struggle with graph/search algorithms... I had the right idea, but just no way to implement it.
 I went back and re-did day 12 again to understand graph/search better. I'm sort of getting it...
 ## Day 13
+Nice and easy. The test folds exactly in half, but the input doesn't, so it took two tries
 ## Day 14
 ## Day 15
 ## Day 16
