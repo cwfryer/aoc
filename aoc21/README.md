@@ -28,9 +28,14 @@ I went back and re-did day 12 again to understand graph/search better. I'm sort 
 ## Day 13
 Nice and easy. The test folds exactly in half, but the input doesn't, so it took two tries
 ## Day 14
+Improved the speed with a hashmap.
 ## Day 15
+Part 1 was pretty easy. Part 2 my solution is too slow (like hours...) Need to revisit.
 ## Day 16
+Nice one. I saw a great solution using bit streams... mine's not as clever.
 ## Day 17
+Part 1... found that a guy did it in his head...
+Need to remember that 1+2+3+..+n = n(n+1) / 2
 ## Day 18
 ## Day 19
 ## Day 20
